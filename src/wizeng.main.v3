@@ -81,7 +81,7 @@ def main(args: Array<string>) -> int {
 
 	// Gather the list of import processors
 	var imports = Array<Exportable>.new(module.imports.length);
-	var i = Instantiator.new(engine.extensions, module, imports, err);
+	var i = Instantiator.new(engine.extensions, module, imports, err, ImportOptions.new(WizengOptions.lazyImports));
 	var map = Strings.newMap<ImportProcessor>();
 
 	for (j < module.imports.length) {
@@ -308,6 +308,8 @@ component WizengOptions {
 	var help = false;
 	var version = false;
 	var pregenFile: string; // file to patch interpreter code into
+	var color = true; // TODO: default value could be auto-detected from the terminal
+	var lazyImports  = false; //
 
 	def parse(engine: Engine, arg: string) -> bool {
 		if (Strings.startsWith(arg, "-pregen=")) {
@@ -337,6 +339,10 @@ component WizengOptions {
 		}
 		if (Strings.equal(arg, "--print-result")) {
 			print_result = true;
+			return true;
+		}
+		if (Strings.equal(arg, "--lazy-import")) {
+			lazyImports = true;
 			return true;
 		}
 		return false;
