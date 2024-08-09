@@ -14,6 +14,7 @@ def SYS_lseek = 8;
 def SYS_sched_yield = 24;
 def SYS_kill = 37;
 def SYS_getpid = 39;
+def SYS_readlink = 89;
 
 
 // Linux lseek whence values
@@ -31,6 +32,18 @@ def timespec = Array<long>.new(2);
 
 // A special value, which tells the fd of the current working directory used in openat
 def AT_FDCWD = -100;
+
+layout Prestat {
+	+0	tag: u8;
+	// Skip 4 bytes for alignment
+	+4  variant: prestat_dir;
+	=8;
+}
+
+layout prestat_dir {
+	+0 pr_name_len: u32;
+	=4;
+}
 
 // Platform-specific implementation of "wasi_snapshot_preview1" module.
 class X86_64Linux_WspOneModule extends WspOneModule {
@@ -84,6 +97,23 @@ class X86_64Linux_WspOneModule extends WspOneModule {
 		DataWriters.write_range_i64(range.result, timespec[0] * 1000000000L + timespec[1]);
 		return HostResult.Value1(Values.I32_0);
 	}
+	def fd_prestat_get(args: Range<Value>) -> HostResult {
+		var fd = Values.v_i(args[0]);
+		if (fd < 0) return HostResult.Value1(Values.i_v(wasi_errno.BADF.code));
+
+		var wasi_fd = fdmap.get(fd);
+		if (wasi_fd == null) return HostResult.Value1(Values.i_v(wasi_errno.NOENT.code));
+
+		var ptr = Values.v_u(args[1]);
+        var range = memory.range_ol_32(ptr, 8);
+		if (range.reason != TrapReason.NONE) return HostResult.Throw(Trap.new(range.reason, null, null));
+
+		var prestat = Ref<Prestat>.of(range.result);
+		prestat.variant.pr_name_len = u32.!(wasi_fd.path.length);
+
+		return HostResult.Value1(Values.I32_0);
+	}
+
 	def mapClockId(clock_id: u32) -> int {
 		if (clock_id > 3) return -1;
 		return int.view(clock_id); // WASI clock ids map directly onto Linux clock IDs
